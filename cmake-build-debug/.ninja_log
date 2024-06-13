@@ -1,0 +1,26 @@
+# ninja log v5
+1	92	7399930850358344	CMakeFiles/Szachy.dir/main.c.obj	37dbfc829bb1daa
+2	759	7399935515573505	CMakeFiles/Szachy.dir/server.c.obj	10ce98e4780a6d73
+2	76	7399932007025478	CMakeFiles/Szachy.dir/chess.c.obj	8b468b8b067d210a
+599	687	7399953803840422	server.exe	58d9b9e9e4f2d0f
+2	626	7399946751170257	CMakeFiles/Szachy.dir/client.c.obj	3eb036bd56e1b314
+3	598	7399953802988560	CMakeFiles/server.dir/server.c.obj	bf167ddd51d0c847
+0	133	7399954651948773	build.ninja	e586e9d40eaa87b6
+6	99	7399951616874789	CMakeFiles/server.dir/chess.c.obj	c7611fce5030aecb
+1	70	7399952269791632	CMakeFiles/client.dir/chess.c.obj	5988af5b5a4a23a8
+5	631	7399952275406788	CMakeFiles/client.dir/client.c.obj	d5521afe5fc070c6
+2	583	7399954714580422	CMakeFiles/server.dir/server.c.obj	bf167ddd51d0c847
+583	677	7399954715491843	server.exe	58d9b9e9e4f2d0f
+2	92	7399954741799514	client.exe	6fb688ebc4823e30
+2	568	7399954926843465	CMakeFiles/client.dir/client.c.obj	d5521afe5fc070c6
+568	659	7399954927696577	client.exe	6fb688ebc4823e30
+2	590	7399956116657867	CMakeFiles/server.dir/server.c.obj	bf167ddd51d0c847
+591	681	7399956117520202	server.exe	58d9b9e9e4f2d0f
+3	73	7399960209813079	CMakeFiles/server.dir/chess.c.obj	c7611fce5030aecb
+73	177	7399960210809545	server.exe	58d9b9e9e4f2d0f
+2	59	7399960302057714	CMakeFiles/client.dir/chess.c.obj	5988af5b5a4a23a8
+60	153	7399960302971692	client.exe	6fb688ebc4823e30
+2	80	7399961811247570	CMakeFiles/server.dir/chess.c.obj	c7611fce5030aecb
+80	180	7399961812210758	server.exe	58d9b9e9e4f2d0f
+2	60	7399961867307344	CMakeFiles/client.dir/chess.c.obj	5988af5b5a4a23a8
+60	144	7399961868134167	client.exe	6fb688ebc4823e30
