@@ -20,20 +20,29 @@ void *handle_client(void *arg) {
     char buffer[1024];
     int n;
 
-    while ((n = recv(client->sockfd, buffer, sizeof(buffer), 0)) > 0) {
-        Move move;
-        memset(&move, 0, sizeof(move));
+    while ((n = recv(client->sockfd, buffer, sizeof(buffer) - 1, 0)) > 0) {
+        PlayerMove pMove;
+        memset(&pMove, 0, sizeof(pMove));
         buffer[n] = '\0';  // Null-terminate the received buffer for safe string operations
 
-        sscanf(buffer, "%c%c %c%c", &move.from_col, &move.from_row, &move.to_col, &move.to_row);
+        // Parsing the move from the buffer
+        if (sscanf(buffer, "%c%c %c%c", &pMove.from_col, &pMove.from_row, &pMove.to_col, &pMove.to_row) == 4) {
 
-        if (is_valid_move(&client->board, move)) {
-            make_move(&client->board, move);
-            client->player_turn = 1 - client->player_turn;
-            send(client->sockfd, "Valid move\n", 11, 0);
+            Move move = convert_to_move(pMove);
+
+            printf("\n(%c%c) - (%c%c) = (%d %d) - (%d %d)\n",pMove.from_col,pMove.from_row,pMove.to_col,pMove.to_row, move.from_col,move.from_row,move.to_col,move.to_row);
+
+            if (is_valid_move(&client->board, move, All)) {
+                make_move(&client->board, move);
+                client->player_turn = 1 - client->player_turn;
+                send(client->sockfd, "Valid move\n", 11, 0);
+            } else {
+                send(client->sockfd, "Invalid move\n", 13, 0);
+            }
         } else {
-            send(client->sockfd, "Invalid move\n", 13, 0);
+            send(client->sockfd, "Invalid input format\n", 21, 0);
         }
+        memset(buffer, 0, sizeof(buffer));
     }
 
     printf("Client disconnected\n");
@@ -41,6 +50,7 @@ void *handle_client(void *arg) {
     free(client);
     return NULL;
 }
+
 
 int main() {
     WSADATA wsaData;

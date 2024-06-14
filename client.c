@@ -11,6 +11,7 @@ int main() {
     SOCKET sockfd;
     struct sockaddr_in server_addr;
     char buffer[1024];
+    PlayerMove pMove;
     Move move;
     ChessBoard board;
 
@@ -37,27 +38,35 @@ int main() {
     init_board(&board);
     while (1) {
         print_board(&board);
-        printf("Enter your move (.. ..): ");
-        memset(&move, 0, sizeof(move));
-        memset(buffer, 0, sizeof(buffer));
+        printf("Enter your move (e.g., a2 a3): ");
 
-        // Read user input directly into the move structure
-        scanf("%c%c %c%c", &move.from_col, &move.from_row, &move.to_col, &move.to_row);
+        // Read user input
+        if (fgets(buffer, sizeof(buffer), stdin) == NULL) {
+            printf("Failed to read input\n");
+            continue;
+        }
+
+        // Parse the move from the buffer
+        if (sscanf(buffer, "%c%c %c%c", &pMove.from_col, &pMove.from_row, &pMove.to_col, &pMove.to_row) != 4) {
+            printf("Invalid input format\n");
+            continue;
+        }
 
         // Format the move into the buffer
-        snprintf(buffer, sizeof(buffer), "%c%c %c%c", move.from_col, move.from_row, move.to_col, move.to_row);
+        snprintf(buffer, sizeof(buffer), "%c%c %c%c", pMove.from_col, pMove.from_row, pMove.to_col, pMove.to_row);
 
         // Send the move to the server
         send(sockfd, buffer, strlen(buffer), 0);
 
         // Receive the server response
         memset(buffer, 0, sizeof(buffer));
-        recv(sockfd, buffer, sizeof(buffer), 0);
+        recv(sockfd, buffer, sizeof(buffer) - 1, 0);  // Leave space for null terminator
+        buffer[sizeof(buffer) - 1] = '\0';  // Ensure null termination
         printf("Server: %s\n", buffer);
 
         // Check if the move is valid and make the move on the local board
         if (strncmp(buffer, "Valid move", 10) == 0) {
-            make_move(&board, move);
+            make_move(&board, convert_to_move(pMove));
         }
     }
 
