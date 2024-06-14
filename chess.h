@@ -8,13 +8,22 @@ typedef struct {
 } ChessBoard;
 
 typedef struct {
-    int from_x, from_y;
-    int to_x, to_y;
+    char from_col;
+    char from_row;
+    char to_col;
+    char to_row;
 } Move;
 
 void init_board(ChessBoard *board);
 int is_valid_move(ChessBoard *board, Move move);
 void make_move(ChessBoard *board, Move move);
 void print_board(ChessBoard *board);
+
+int is_valid_pawn_move(ChessBoard *board, Move move, char sign);
+int is_valid_tower_move(ChessBoard *board, Move move, char sign);
+int is_valid_horse_move(ChessBoard *board, Move move, char sign);
+int is_valid_bishop_move(ChessBoard *board, Move move, char sign);
+int is_valid_queen_move(ChessBoard *board, Move move, char sign);
+int is_valid_king_move(ChessBoard *board, Move move, char sign);
 
 #endif // CHESS_H

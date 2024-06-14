@@ -1,7 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 #include <winsock2.h>
 #include <pthread.h>
 #include "chess.h"
@@ -24,7 +22,10 @@ void *handle_client(void *arg) {
 
     while ((n = recv(client->sockfd, buffer, sizeof(buffer), 0)) > 0) {
         Move move;
-        sscanf(buffer, "%d %d %d %d", &move.from_x, &move.from_y, &move.to_x, &move.to_y);
+        memset(&move, 0, sizeof(move));
+        buffer[n] = '\0';  // Null-terminate the received buffer for safe string operations
+
+        sscanf(buffer, "%c%c %c%c", &move.from_col, &move.from_row, &move.to_col, &move.to_row);
 
         if (is_valid_move(&client->board, move)) {
             make_move(&client->board, move);
@@ -35,6 +36,7 @@ void *handle_client(void *arg) {
         }
     }
 
+    printf("Client disconnected\n");
     closesocket(client->sockfd);
     free(client);
     return NULL;
@@ -47,13 +49,14 @@ int main() {
     int client_len = sizeof(client_addr);
     pthread_t tid;
 
-    if (WSAStartup(MAKEWORD(2,2), &wsaData) != 0) {
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
         printf("WSAStartup failed: %d\n", WSAGetLastError());
         exit(1);
     }
 
     if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET) {
         printf("Socket creation failed: %d\n", WSAGetLastError());
+        WSACleanup();
         exit(1);
     }
 
@@ -63,25 +66,45 @@ int main() {
 
     if (bind(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) == SOCKET_ERROR) {
         printf("Socket bind failed: %d\n", WSAGetLastError());
+        closesocket(sockfd);
+        WSACleanup();
         exit(1);
     }
 
     if (listen(sockfd, MAX_CLIENTS) == SOCKET_ERROR) {
         printf("Listen failed: %d\n", WSAGetLastError());
+        closesocket(sockfd);
+        WSACleanup();
         exit(1);
     }
 
+    printf("Server listening on port %d\n", PORT);
+
     while ((newsockfd = accept(sockfd, (struct sockaddr *)&client_addr, &client_len)) != INVALID_SOCKET) {
         ClientInfo *client = malloc(sizeof(ClientInfo));
+        if (client == NULL) {
+            printf("Failed to allocate memory for client\n");
+            closesocket(newsockfd);
+            continue;
+        }
+
         client->sockfd = newsockfd;
         client->address = client_addr;
         client->addr_len = client_len;
         init_board(&client->board);
+        print_board(&client->board);
         client->player_turn = 0;
 
-        pthread_create(&tid, NULL, handle_client, client);
+        if (pthread_create(&tid, NULL, handle_client, client) != 0) {
+            printf("Failed to create thread\n");
+            closesocket(newsockfd);
+            free(client);
+        } else {
+            pthread_detach(tid); // Detach thread to handle its own cleanup
+        }
     }
 
+    printf("Server shutting down\n");
     closesocket(sockfd);
     WSACleanup();
     return 0;

@@ -14,11 +14,13 @@ set(SOURCES
 # Add executable targets
 add_executable(server server.c chess.c)
 add_executable(client client.c chess.c)
+add_executable(client2 client.c chess.c)
 
 # Link with pthread library for server
 if (WIN32)
     target_link_libraries(server PRIVATE ws2_32)
     target_link_libraries(client PRIVATE ws2_32)
+    target_link_libraries(client2 PRIVATE ws2_32)
 else()
     target_link_libraries(server PRIVATE pthread)
 endif()

@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <winsock2.h>
 #include "chess.h"
 
@@ -15,7 +14,7 @@ int main() {
     Move move;
     ChessBoard board;
 
-    if (WSAStartup(MAKEWORD(2,2), &wsaData) != 0) {
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
         printf("WSAStartup failed: %d\n", WSAGetLastError());
         exit(1);
     }
@@ -38,15 +37,25 @@ int main() {
     init_board(&board);
     while (1) {
         print_board(&board);
-        printf("Enter your move (from_x from_y to_x to_y): ");
-        scanf("%d %d %d %d", &move.from_x, &move.from_y, &move.to_x, &move.to_y);
+        printf("Enter your move (.. ..): ");
+        memset(&move, 0, sizeof(move));
+        memset(buffer, 0, sizeof(buffer));
 
-        sprintf(buffer, "%d %d %d %d", move.from_x, move.from_y, move.to_x, move.to_y);
+        // Read user input directly into the move structure
+        scanf("%c%c %c%c", &move.from_col, &move.from_row, &move.to_col, &move.to_row);
+
+        // Format the move into the buffer
+        snprintf(buffer, sizeof(buffer), "%c%c %c%c", move.from_col, move.from_row, move.to_col, move.to_row);
+
+        // Send the move to the server
         send(sockfd, buffer, strlen(buffer), 0);
 
+        // Receive the server response
+        memset(buffer, 0, sizeof(buffer));
         recv(sockfd, buffer, sizeof(buffer), 0);
-        printf("Server: %s", buffer);
+        printf("Server: %s\n", buffer);
 
+        // Check if the move is valid and make the move on the local board
         if (strncmp(buffer, "Valid move", 10) == 0) {
             make_move(&board, move);
         }

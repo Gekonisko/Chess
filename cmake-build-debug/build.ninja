@@ -118,6 +118,45 @@ build client.exe: C_EXECUTABLE_LINKER__client_Debug CMakeFiles/client.dir/client
   TARGET_IMPLIB = libclient.dll.a
   TARGET_PDB = client.exe.dbg
 
+# =============================================================================
+# Object build statements for EXECUTABLE target client2
+
+
+#############################################
+# Order-only phony target for client2
+
+build cmake_object_order_depends_target_client2: phony || CMakeFiles/client2.dir
+
+build CMakeFiles/client2.dir/client.c.obj: C_COMPILER__client2_Debug C$:/Users/Kuba/Documents/AGH/Programowanie$ Sieciowe/Szachy/client.c || cmake_object_order_depends_target_client2
+  DEP_FILE = CMakeFiles\client2.dir\client.c.obj.d
+  FLAGS = -g -fdiagnostics-color=always -std=gnu11
+  OBJECT_DIR = CMakeFiles\client2.dir
+  OBJECT_FILE_DIR = CMakeFiles\client2.dir
+
+build CMakeFiles/client2.dir/chess.c.obj: C_COMPILER__client2_Debug C$:/Users/Kuba/Documents/AGH/Programowanie$ Sieciowe/Szachy/chess.c || cmake_object_order_depends_target_client2
+  DEP_FILE = CMakeFiles\client2.dir\chess.c.obj.d
+  FLAGS = -g -fdiagnostics-color=always -std=gnu11
+  OBJECT_DIR = CMakeFiles\client2.dir
+  OBJECT_FILE_DIR = CMakeFiles\client2.dir
+
+
+# =============================================================================
+# Link build statements for EXECUTABLE target client2
+
+
+#############################################
+# Link the executable client2.exe
+
+build client2.exe: C_EXECUTABLE_LINKER__client2_Debug CMakeFiles/client2.dir/client.c.obj CMakeFiles/client2.dir/chess.c.obj
+  FLAGS = -g
+  LINK_LIBRARIES = -lws2_32  -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32
+  OBJECT_DIR = CMakeFiles\client2.dir
+  POST_BUILD = cd .
+  PRE_LINK = cd .
+  TARGET_FILE = client2.exe
+  TARGET_IMPLIB = libclient2.dll.a
+  TARGET_PDB = client2.exe.dbg
+
 
 #############################################
 # Utility command for edit_cache
@@ -146,6 +185,8 @@ build rebuild_cache: phony CMakeFiles/rebuild_cache.util
 
 build client: phony client.exe
 
+build client2: phony client2.exe
+
 build server: phony server.exe
 
 # =============================================================================
@@ -156,7 +197,7 @@ build server: phony server.exe
 #############################################
 # Folder: C:/Users/Kuba/Documents/AGH/Programowanie Sieciowe/Szachy/cmake-build-debug
 
-build all: phony server.exe client.exe
+build all: phony server.exe client.exe client2.exe
 
 # =============================================================================
 # Built-in targets
