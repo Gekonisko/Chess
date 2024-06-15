@@ -15,6 +15,14 @@ typedef struct {
     int player_turn;
 } ClientInfo;
 
+typedef struct {
+    char username[50];
+    char password[50];
+} User;
+
+User users[MAX_CLIENTS];
+int user_count = 0;
+
 void *handle_client(void *arg) {
     ClientInfo *client = (ClientInfo *)arg;
     char buffer[1024];
@@ -51,6 +59,79 @@ void *handle_client(void *arg) {
     return NULL;
 }
 
+int validate_user(const char *username, const char *password) {
+    for (int i = 0; i < user_count; i++) {
+        if (strcmp(users[i].username, username) == 0 && strcmp(users[i].password, password) == 0) {
+            return 1; // Valid user
+        }
+    }
+    return 0; // Invalid user
+}
+
+int register_user(const char *username, const char *password) {
+    if (user_count >= MAX_CLIENTS) {
+        return 0; // Registration failed, user limit reached
+    }
+    for (int i = 0; i < user_count; i++) {
+        if (strcmp(users[i].username, username) == 0) {
+            return 0; // Username already exists
+        }
+    }
+    strcpy(users[user_count].username, username);
+    strcpy(users[user_count].password, password);
+    user_count++;
+    return 1; // Registration successful
+}
+
+void handle_login_register(SOCKET sockfd) {
+    char buffer[1024];
+    char choice[1024];
+    char username[50];
+    char password[50];
+    int n;
+
+    // Receive choice from client
+    n = recv(sockfd, buffer, sizeof(buffer) - 1, 0);
+    if (n <= 0) {
+        return;
+    }
+    buffer[n] = '\0';
+
+    strcpy(choice, buffer);
+
+    // printf("\n%.*s",1024,choice);
+
+    // Receive credentials from client
+    n = recv(sockfd, buffer, sizeof(buffer) - 1, 0);
+    if (n <= 0) {
+        return;
+    }
+    buffer[n] = '\0';
+
+    sscanf(buffer, "%[^:]:%s", username, password);
+
+    if (strcmp(choice, "REGISTER") == 0) {
+        if (register_user(username, password)) {
+            send(sockfd, "Registration successful\n", 24, 0);
+        } else {
+            send(sockfd, "Registration failed\n", 20, 0);
+            closesocket(sockfd);
+            pthread_exit(NULL);
+        }
+    } else if (strcmp(choice, "LOGIN") == 0) {
+        if (validate_user(username, password)) {
+            send(sockfd, "Login successful\n", 17, 0);
+        } else {
+            send(sockfd, "Login failed\n", 13, 0);
+            closesocket(sockfd);
+            pthread_exit(NULL);
+        }
+    } else {
+        send(sockfd, "Invalid choice\n", 15, 0);
+        closesocket(sockfd);
+        pthread_exit(NULL);
+    }
+}
 
 int main() {
     WSADATA wsaData;
@@ -97,6 +178,11 @@ int main() {
             closesocket(newsockfd);
             continue;
         }
+
+        printf("Client connected\n");
+
+        // login or register handle
+        handle_login_register(newsockfd);
 
         client->sockfd = newsockfd;
         client->address = client_addr;
