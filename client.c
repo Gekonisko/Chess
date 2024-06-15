@@ -6,6 +6,48 @@
 
 #define PORT 8080
 
+void login_screen(SOCKET sockfd) {
+    char choice;
+    char username[50];
+    char password[50];
+    char buffer[1024];
+
+    printf("Do you want to (R)egister or (L)ogin? ");
+    scanf(" %c", &choice);
+    getchar();  // to consume the newline character left in the buffer
+
+    if (choice == 'R' || choice == 'r') {
+        strcpy(buffer, "REGISTER");
+    } else if (choice == 'L' || choice == 'l') {
+        strcpy(buffer, "LOGIN");
+    } else {
+        printf("Invalid choice\n");
+        return;
+    }
+
+    send(sockfd, buffer, strlen(buffer), 0);
+
+    printf("Enter username: ");
+    fgets(username, sizeof(username), stdin);
+    username[strcspn(username, "\n")] = 0;  // remove newline character
+
+    printf("Enter password: ");
+    fgets(password, sizeof(password), stdin);
+    password[strcspn(password, "\n")] = 0;  // remove newline character
+
+    snprintf(buffer, sizeof(buffer), "%s:%s", username, password);
+    send(sockfd, buffer, strlen(buffer), 0);
+
+    memset(buffer, 0, sizeof(buffer));
+    recv(sockfd, buffer, sizeof(buffer) - 1, 0);
+    printf("Server: %s\n", buffer);
+
+    if (strncmp(buffer, "Login successful", 16) != 0) {
+        printf("Login/Register failed. Exiting...\n");
+        exit(1);
+    }
+}
+
 int main() {
     WSADATA wsaData;
     SOCKET sockfd;
@@ -14,8 +56,6 @@ int main() {
     PlayerMove pMove;
     Move move;
     ChessBoard board;
-
-    printf("Config test");
 
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
         printf("WSAStartup failed: %d\n", WSAGetLastError());
@@ -36,6 +76,9 @@ int main() {
         printf("Connection to server failed: %d\n", WSAGetLastError());
         exit(1);
     }
+
+    // printf("Config test");
+    login_screen(sockfd);
 
     init_board(&board);
     while (1) {
