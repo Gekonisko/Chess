@@ -15,6 +15,8 @@ int main() {
     Move move;
     ChessBoard board;
 
+    printf("Config test");
+
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
         printf("WSAStartup failed: %d\n", WSAGetLastError());
         exit(1);
