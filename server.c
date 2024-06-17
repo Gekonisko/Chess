@@ -36,7 +36,7 @@ void *handle_client(void *arg) {
 
             Move move = convert_to_move(pMove);
 
-            printf("\n(%c%c) - (%c%c) = (%d %d) - (%d %d)\n",pMove.from_col,pMove.from_row,pMove.to_col,pMove.to_row, move.from_col,move.from_row,move.to_col,move.to_row);
+            printf("\n(%c%c) - (%c%c) = (%d %d) - (%d %d)\n",pMove.from_col,pMove.from_row,pMove.to_col,pMove.to_row, move.from.col,move.from.row,move.to.col,move.to.row);
 
             if (is_valid_move(&client->board, move, All)) {
                 make_move(&client->board, move);
