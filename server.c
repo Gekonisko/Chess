@@ -14,14 +14,11 @@ typedef struct {
     int addr_len;
     ChessBoard board;
     int player_turn;
+    int paired;
+    char username[50];
 } ClientInfo;
 
-typedef struct {
-    char username[50];
-    char password[50];
-} User;
-
-User users[MAX_CLIENTS];
+char user_nick[50];
 int user_count = 0;
 
 void *handle_client(void *arg) {
@@ -113,8 +110,6 @@ void handle_login_register(SOCKET sockfd) {
 
     strcpy(choice, buffer);
 
-    // printf("\n%.*s",1024,choice);
-
     // Receive credentials from client
     n = recv(sockfd, buffer, sizeof(buffer) - 1, 0);
     if (n <= 0) {
@@ -127,24 +122,50 @@ void handle_login_register(SOCKET sockfd) {
     if (strcmp(choice, "REGISTER") == 0) {
         if (register_user(username, password)) {
             send(sockfd, "Registration successful\n", 24, 0);
+            strcpy(user_nick,username);
         } else {
             send(sockfd, "Registration failed\n", 20, 0);
             closesocket(sockfd);
-            // pthread_exit(NULL);
+            // return;
+            pthread_exit(NULL);
         }
     } else if (strcmp(choice, "LOGIN") == 0) {
         if (validate_user(username, password)) {
             send(sockfd, "Login successful\n", 17, 0);
+            strcpy(user_nick,username);
         } else {
             send(sockfd, "Login failed\n", 13, 0);
             closesocket(sockfd);
-            // pthread_exit(NULL);
+            // return;
+            pthread_exit(NULL);
         }
     } else {
         send(sockfd, "Invalid choice\n", 15, 0);
         closesocket(sockfd);
-        // pthread_exit(NULL);
+        // return;
+        pthread_exit(NULL);
     }
+}
+
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+ClientInfo *waiting_client = NULL;
+
+void pair_clients(ClientInfo *client1, ClientInfo *client2, int game_id) {
+    client1->paired = 1;
+    client2->paired = 1;
+
+    // Initializing the chessboard for both clients
+    init_board(&client1->board);
+    memcpy(&client2->board, &client1->board, sizeof(ChessBoard));
+
+    client1->player_turn = 0;
+    client2->player_turn = 1;
+
+    printf("Game ID: %d, Player 1 username: %s , Player 2 username: %s\n", game_id, client1->username,client2->username);
+
+    // Starting the game
+    pthread_create(&(pthread_t){0}, NULL, handle_client, client1);
+    pthread_create(&(pthread_t){0}, NULL, handle_client, client2);
 }
 
 int main() {
@@ -152,7 +173,7 @@ int main() {
     SOCKET sockfd, newsockfd;
     struct sockaddr_in server_addr, client_addr;
     int client_len = sizeof(client_addr);
-    pthread_t tid;
+    int i=0;
 
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
         printf("WSAStartup failed: %d\n", WSAGetLastError());
@@ -201,17 +222,32 @@ int main() {
         client->sockfd = newsockfd;
         client->address = client_addr;
         client->addr_len = client_len;
-        init_board(&client->board);
-        print_board(&client->board);
-        client->player_turn = 0;
+        client->paired = 0;
+        strcpy(client->username,user_nick);
+        // init_board(&client->board);
+        // print_board(&client->board);
+        // client->player_turn = 0;
 
-        if (pthread_create(&tid, NULL, handle_client, client) != 0) {
-            printf("Failed to create thread\n");
-            closesocket(newsockfd);
-            free(client);
+        pthread_mutex_lock(&mutex);
+
+        if (waiting_client == NULL) {
+            waiting_client = client;
         } else {
-            pthread_detach(tid); // Detach thread to handle its own cleanup
+            pair_clients(waiting_client, client, i);
+            i++;
+            waiting_client = NULL;
         }
+
+        // Unlock the mutex after modification
+        pthread_mutex_unlock(&mutex);
+
+        // if (pthread_create(&tid, NULL, handle_client, client) != 0) {
+        //     printf("Failed to create thread\n");
+        //     closesocket(newsockfd);
+        //     free(client);
+        // } else {
+        //     pthread_detach(tid); // Detach thread to handle its own cleanup
+        // }
     }
 
     printf("Server shutting down\n");
