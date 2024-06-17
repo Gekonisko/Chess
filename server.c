@@ -6,6 +6,7 @@
 
 #define PORT 8080
 #define MAX_CLIENTS 10
+#define CREDENTIALS_FILE "cred.txt"
 
 typedef struct {
     SOCKET sockfd;
@@ -60,26 +61,39 @@ void *handle_client(void *arg) {
 }
 
 int validate_user(const char *username, const char *password) {
-    for (int i = 0; i < user_count; i++) {
-        if (strcmp(users[i].username, username) == 0 && strcmp(users[i].password, password) == 0) {
+    FILE *file = fopen(CREDENTIALS_FILE, "r");
+    if (!file) {
+        return 0; // Failed to open file
+    }
+
+    char file_username[50], file_password[50];
+    while (fscanf(file, "%49s %49s", file_username, file_password) == 2) {
+        if (strcmp(file_username, username) == 0 && strcmp(file_password, password) == 0) {
+            fclose(file);
             return 1; // Valid user
         }
     }
+
+    fclose(file);
     return 0; // Invalid user
 }
 
 int register_user(const char *username, const char *password) {
-    if (user_count >= MAX_CLIENTS) {
-        return 0; // Registration failed, user limit reached
+    FILE *file = fopen(CREDENTIALS_FILE, "a+");
+    if (!file) {
+        return 0; // Failed to open file
     }
-    for (int i = 0; i < user_count; i++) {
-        if (strcmp(users[i].username, username) == 0) {
+
+    char file_username[50], file_password[50];
+    while (fscanf(file, "%49s %49s", file_username, file_password) == 2) {
+        if (strcmp(file_username, username) == 0) {
+            fclose(file);
             return 0; // Username already exists
         }
     }
-    strcpy(users[user_count].username, username);
-    strcpy(users[user_count].password, password);
-    user_count++;
+
+    fprintf(file, "%s %s\n", username, password);
+    fclose(file);
     return 1; // Registration successful
 }
 
@@ -116,7 +130,7 @@ void handle_login_register(SOCKET sockfd) {
         } else {
             send(sockfd, "Registration failed\n", 20, 0);
             closesocket(sockfd);
-            pthread_exit(NULL);
+            // pthread_exit(NULL);
         }
     } else if (strcmp(choice, "LOGIN") == 0) {
         if (validate_user(username, password)) {
@@ -124,12 +138,12 @@ void handle_login_register(SOCKET sockfd) {
         } else {
             send(sockfd, "Login failed\n", 13, 0);
             closesocket(sockfd);
-            pthread_exit(NULL);
+            // pthread_exit(NULL);
         }
     } else {
         send(sockfd, "Invalid choice\n", 15, 0);
         closesocket(sockfd);
-        pthread_exit(NULL);
+        // pthread_exit(NULL);
     }
 }
 
