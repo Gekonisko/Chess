@@ -22,7 +22,7 @@ void login_screen(SOCKET sockfd) {
         strcpy(buffer, "LOGIN");
     } else {
         printf("Invalid choice\n");
-        return;
+        exit(1);
     }
 
     send(sockfd, buffer, strlen(buffer), 0);
