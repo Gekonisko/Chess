@@ -42,8 +42,8 @@ void login_screen(SOCKET sockfd) {
     recv(sockfd, buffer, sizeof(buffer) - 1, 0);
     printf("Server: %s\n", buffer);
 
-    if (strncmp(buffer, "Login successful", 16) != 0) {
-        printf("Login/Register failed. Exiting...\n");
+    if (strncmp(buffer, "Registration failed\n", 16) == 0 || strncmp(buffer, "Login failed\n", 16) == 0 ) {
+        printf("Registration/Login failed. Exiting...\n");
         exit(1);
     }
 }
