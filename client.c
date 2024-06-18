@@ -57,7 +57,15 @@ void *receive_notifications(void *arg) {
 
     while ((n = recv(sockfd, buffer, sizeof(buffer) - 1, 0)) > 0) {
         buffer[n] = '\0';
-        printf("Notification: %s\n", buffer);
+
+        // Check if buffer contains the board
+        if (strstr(buffer, "THBQKBHT") != NULL || strstr(buffer, "thbqkbht") != NULL) {
+            ChessBoard board;
+            memcpy(&board, buffer, sizeof(ChessBoard));
+            print_board(&board);
+        } else {
+            printf("Notification: %s\n", buffer);
+        }
     }
 
     return NULL;
