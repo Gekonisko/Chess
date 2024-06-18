@@ -2,9 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <winsock2.h>
+#include <pthread.h>
 #include "chess.h"
 
-#define PORT 8080
+#define PORT 9090
 
 void login_screen(SOCKET sockfd) {
     char choice;
@@ -48,6 +49,20 @@ void login_screen(SOCKET sockfd) {
     }
 }
 
+void *receive_notifications(void *arg) {
+    SOCKET sockfd = *(SOCKET *)arg;
+    char buffer[1024];
+    int n;
+
+    while ((n = recv(sockfd, buffer, sizeof(buffer) - 1, 0)) > 0) {
+        buffer[n] = '\0';
+        printf("Notification: %s\n", buffer);
+    }
+
+    return NULL;
+}
+
+
 int main() {
     WSADATA wsaData;
     SOCKET sockfd;
@@ -56,6 +71,7 @@ int main() {
     PlayerMove pMove;
     Move move;
     ChessBoard board;
+    pthread_t notification_thread;
 
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
         printf("WSAStartup failed: %d\n", WSAGetLastError());
@@ -77,8 +93,10 @@ int main() {
         exit(1);
     }
 
-    // printf("Config test");
     login_screen(sockfd);
+
+    // Uruchomienie wątku odbierającego powiadomienia
+    pthread_create(&notification_thread, NULL, receive_notifications, &sockfd);
 
     init_board(&board);
     while (1) {
@@ -119,3 +137,4 @@ int main() {
     WSACleanup();
     return 0;
 }
+

@@ -4,7 +4,7 @@
 #include <pthread.h>
 #include "chess.h"
 
-#define PORT 8080
+#define PORT 9090
 #define MAX_CLIENTS 10
 #define CREDENTIALS_FILE "cred.txt"
 
@@ -17,15 +17,22 @@ typedef struct {
     int paired;
     char username[50];
     enum FiguresColor color;
+    struct ClientInfo *opponent;
 } ClientInfo;
 
 char user_nick[50];
 int user_count = 0;
 
+void notify_opponent(ClientInfo *opponent, const char *message) {
+    send(opponent->sockfd, message, strlen(message), 0);
+}
+
 void *handle_client(void *arg) {
     ClientInfo *client = (ClientInfo *)arg;
     char buffer[1024];
     int n;
+
+    ClientInfo *opponent = client->opponent;  // Przypisanie przeciwnika
 
     while ((n = recv(client->sockfd, buffer, sizeof(buffer) - 1, 0)) > 0) {
         PlayerMove pMove;
@@ -34,20 +41,26 @@ void *handle_client(void *arg) {
 
         // Parsing the move from the buffer
         if (sscanf(buffer, "%c%c %c%c", &pMove.from_col, &pMove.from_row, &pMove.to_col, &pMove.to_row) == 4) {
-
             Move move = convert_to_move(pMove);
 
-            printf("\n(%c%c) - (%c%c) = (%d %d) - (%d %d)\n",pMove.from_col,pMove.from_row,pMove.to_col,pMove.to_row, move.from.col,move.from.row,move.to.col,move.to.row);
+            printf("\n(%c%c) - (%c%c) = (%d %d) - (%d %d)\n", pMove.from_col, pMove.from_row, pMove.to_col, pMove.to_row, move.from.col, move.from.row, move.to.col, move.to.row);
 
             if (is_valid_move(&client->board, move, client->color)) {
                 make_move(&client->board, move);
                 client->player_turn = 1 - client->player_turn;
-                if(is_black_king_check(&client->board))
-                    send(client->sockfd, "Black King Check\n", 11, 0);
-                else if(is_white_king_check(&client->board))
-                    send(client->sockfd, "White King Check\n", 11, 0);
+                if (is_black_king_check(&client->board))
+                    send(client->sockfd, "Black King Check\n", 18, 0);
+                else if (is_white_king_check(&client->board))
+                    send(client->sockfd, "White King Check\n", 18, 0);
                 else
                     send(client->sockfd, "Valid move\n", 11, 0);
+
+                // Powiadomienie przeciwnika o ruchu
+                if (opponent) {
+                    char notify_msg[1024];
+                    snprintf(notify_msg, sizeof(notify_msg), "Opponent moved: %c%c to %c%c\n", pMove.from_col, pMove.from_row, pMove.to_col, pMove.to_row);
+                    send(opponent->sockfd, notify_msg, strlen(notify_msg), 0);
+                }
             } else {
                 send(client->sockfd, "Invalid move\n", 13, 0);
             }
@@ -62,6 +75,7 @@ void *handle_client(void *arg) {
     free(client);
     return NULL;
 }
+
 
 int validate_user(const char *username, const char *password) {
     FILE *file = fopen(CREDENTIALS_FILE, "r");
@@ -160,6 +174,10 @@ void pair_clients(ClientInfo *client1, ClientInfo *client2, int game_id) {
     client1->paired = 1;
     client2->paired = 1;
 
+    // Przypisanie przeciwnika
+    client1->opponent = client2;
+    client2->opponent = client1;
+
     // Initializing the chessboard for both clients
     init_board(&client1->board);
     memcpy(&client2->board, &client1->board, sizeof(ChessBoard));
@@ -170,12 +188,18 @@ void pair_clients(ClientInfo *client1, ClientInfo *client2, int game_id) {
     client1->color = White;
     client2->color = Black;
 
-    printf("Game ID: %d, Player 1 username: %s , Player 2 username: %s\n", game_id, client1->username,client2->username);
+    printf("Game ID: %d, Player 1 username: %s , Player 2 username: %s\n", game_id, client1->username, client2->username);
+
+    // Powiadomienie klientów o rozpoczęciu gry
+    send(client1->sockfd, "Game started. You are White.\n", 30, 0);
+    send(client2->sockfd, "Game started. You are Black.\n", 30, 0);
 
     // Starting the game
     pthread_create(&(pthread_t){0}, NULL, handle_client, client1);
     pthread_create(&(pthread_t){0}, NULL, handle_client, client2);
 }
+
+
 
 int main() {
     WSADATA wsaData;
