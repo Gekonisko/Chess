@@ -1,3 +1,4 @@
+// Zaktualizowany plik server.c
 #include <stdio.h>
 #include <stdlib.h>
 #include <winsock2.h>
@@ -18,10 +19,18 @@ typedef struct {
     char username[50];
     enum FiguresColor color;
     struct ClientInfo *opponent;
+    PlayerMove moves[100];  // Array to store moves
+    int num_moves;          // Number of moves made
 } ClientInfo;
 
 char user_nick[50];
 int user_count = 0;
+
+ChessBoard server_board;
+
+void init_server_board() {
+    init_board(&server_board);
+}
 
 void notify_opponent(ClientInfo *opponent, const char *message) {
     send(opponent->sockfd, message, strlen(message), 0);
@@ -32,7 +41,7 @@ void *handle_client(void *arg) {
     char buffer[1024];
     int n;
 
-    ClientInfo *opponent = client->opponent;  // Przypisanie przeciwnika
+    ClientInfo *opponent = client->opponent;  // Assign the opponent
 
     while ((n = recv(client->sockfd, buffer, sizeof(buffer) - 1, 0)) > 0) {
         PlayerMove pMove;
@@ -43,24 +52,42 @@ void *handle_client(void *arg) {
         if (sscanf(buffer, "%c%c %c%c", &pMove.from_col, &pMove.from_row, &pMove.to_col, &pMove.to_row) == 4) {
             Move move = convert_to_move(pMove);
 
-            printf("\n(%c%c) - (%c%c) = (%d %d) - (%d %d)\n", pMove.from_col, pMove.from_row, pMove.to_col, pMove.to_row, move.from.col, move.from.row, move.to.col, move.to.row);
-
+            // Validate the move
             if (is_valid_move(&client->board, move, client->color)) {
-                make_move(&client->board, move);
-                client->player_turn = 1 - client->player_turn;
-                if (is_black_king_check(&client->board))
-                    send(client->sockfd, "Black King Check\n", 18, 0);
-                else if (is_white_king_check(&client->board))
-                    send(client->sockfd, "White King Check\n", 18, 0);
-                else
-                    send(client->sockfd, "Valid move\n", 11, 0);
+                // Store the move in client's move history
+                client->moves[client->num_moves++] = pMove;
 
-                // Powiadomienie przeciwnika o ruchu
+                // Make the move on the board
+                make_move(&client->board, move);
+
+                // Synchronize the board with the opponent
+                if (opponent) {
+                    memcpy(&opponent->board, &client->board, sizeof(ChessBoard));
+                }
+
+                // Toggle player turn
+                client->player_turn = 1 - client->player_turn;
+
+                // Check for check conditions
+                if (is_black_king_check(&client->board))
+                    notify_opponent(client, "Black King Check\n");
+                else if (is_white_king_check(&client->board))
+                    notify_opponent(client, "White King Check\n");
+                else
+                    notify_opponent(client, "Valid move\n");
+
+                // Notify opponent about the move made
                 if (opponent) {
                     char notify_msg[1024];
                     snprintf(notify_msg, sizeof(notify_msg), "Opponent moved: %c%c to %c%c\n", pMove.from_col, pMove.from_row, pMove.to_col, pMove.to_row);
                     send(opponent->sockfd, notify_msg, strlen(notify_msg), 0);
                 }
+
+                // Send updated board state and all moves to both clients
+                send(client->sockfd, &client->board, sizeof(ChessBoard), 0);
+                if (opponent)
+                    send(opponent->sockfd, &client->board, sizeof(ChessBoard), 0);
+
             } else {
                 send(client->sockfd, "Invalid move\n", 13, 0);
             }
@@ -72,6 +99,14 @@ void *handle_client(void *arg) {
 
     printf("Client disconnected\n");
     closesocket(client->sockfd);
+
+    // Clean up resources
+    if (opponent) {
+        opponent->opponent = NULL;
+        opponent->paired = 0;
+        notify_opponent(opponent, "Opponent disconnected\n");
+    }
+
     free(client);
     return NULL;
 }
@@ -142,7 +177,7 @@ void handle_login_register(SOCKET sockfd) {
     if (strcmp(choice, "REGISTER") == 0) {
         if (register_user(username, password)) {
             send(sockfd, "Registration successful\n", 24, 0);
-            strcpy(user_nick,username);
+            strcpy(user_nick, username);
         } else {
             send(sockfd, "Registration failed\n", 20, 0);
             closesocket(sockfd);
@@ -152,7 +187,7 @@ void handle_login_register(SOCKET sockfd) {
     } else if (strcmp(choice, "LOGIN") == 0) {
         if (validate_user(username, password)) {
             send(sockfd, "Login successful\n", 17, 0);
-            strcpy(user_nick,username);
+            strcpy(user_nick, username);
         } else {
             send(sockfd, "Login failed\n", 13, 0);
             closesocket(sockfd);
@@ -174,13 +209,13 @@ void pair_clients(ClientInfo *client1, ClientInfo *client2, int game_id) {
     client1->paired = 1;
     client2->paired = 1;
 
-    // Przypisanie przeciwnika
+    // Assign opponents
     client1->opponent = client2;
     client2->opponent = client1;
 
-    // Initializing the chessboard for both clients
-    init_board(&client1->board);
-    memcpy(&client2->board, &client1->board, sizeof(ChessBoard));
+    // Copy the server's initialized board to both clients
+    memcpy(&client1->board, &server_board, sizeof(ChessBoard));
+    memcpy(&client2->board, &server_board, sizeof(ChessBoard));
 
     client1->player_turn = 0;
     client2->player_turn = 1;
@@ -188,9 +223,9 @@ void pair_clients(ClientInfo *client1, ClientInfo *client2, int game_id) {
     client1->color = White;
     client2->color = Black;
 
-    printf("Game ID: %d, Player 1 username: %s , Player 2 username: %s\n", game_id, client1->username, client2->username);
+    printf("Game ID: %d, Player 1 username: %s, Player 2 username: %s\n", game_id, client1->username, client2->username);
 
-    // Powiadomienie klientów o rozpoczęciu gry
+    // Notify clients about the start of the game
     send(client1->sockfd, "Game started. You are White.\n", 30, 0);
     send(client2->sockfd, "Game started. You are Black.\n", 30, 0);
 
@@ -199,14 +234,12 @@ void pair_clients(ClientInfo *client1, ClientInfo *client2, int game_id) {
     pthread_create(&(pthread_t){0}, NULL, handle_client, client2);
 }
 
-
-
 int main() {
     WSADATA wsaData;
     SOCKET sockfd, newsockfd;
     struct sockaddr_in server_addr, client_addr;
     int client_len = sizeof(client_addr);
-    int i=0;
+    int i = 0;
 
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
         printf("WSAStartup failed: %d\n", WSAGetLastError());
@@ -239,6 +272,9 @@ int main() {
 
     printf("Server listening on port %d\n", PORT);
 
+    // Initialize the server board
+    init_server_board();
+
     while ((newsockfd = accept(sockfd, (struct sockaddr *)&client_addr, &client_len)) != INVALID_SOCKET) {
         ClientInfo *client = malloc(sizeof(ClientInfo));
         if (client == NULL) {
@@ -249,17 +285,14 @@ int main() {
 
         printf("Client connected\n");
 
-        // login or register handle
+        // Handle login or register
         handle_login_register(newsockfd);
 
         client->sockfd = newsockfd;
         client->address = client_addr;
         client->addr_len = client_len;
         client->paired = 0;
-        strcpy(client->username,user_nick);
-        // init_board(&client->board);
-        // print_board(&client->board);
-        // client->player_turn = 0;
+        strcpy(client->username, user_nick);
 
         pthread_mutex_lock(&mutex);
 
@@ -271,16 +304,7 @@ int main() {
             waiting_client = NULL;
         }
 
-        // Unlock the mutex after modification
         pthread_mutex_unlock(&mutex);
-
-        // if (pthread_create(&tid, NULL, handle_client, client) != 0) {
-        //     printf("Failed to create thread\n");
-        //     closesocket(newsockfd);
-        //     free(client);
-        // } else {
-        //     pthread_detach(tid); // Detach thread to handle its own cleanup
-        // }
     }
 
     printf("Server shutting down\n");

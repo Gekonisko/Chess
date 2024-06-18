@@ -1,3 +1,4 @@
+// Zaktualizowany plik client.c
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -61,15 +62,12 @@ void *receive_notifications(void *arg) {
 
     return NULL;
 }
-
-
 int main() {
     WSADATA wsaData;
     SOCKET sockfd;
     struct sockaddr_in server_addr;
     char buffer[1024];
     PlayerMove pMove;
-    Move move;
     ChessBoard board;
     pthread_t notification_thread;
 
@@ -95,12 +93,13 @@ int main() {
 
     login_screen(sockfd);
 
-    // Uruchomienie wątku odbierającego powiadomienia
+    // Start notification thread for receiving server messages
     pthread_create(&notification_thread, NULL, receive_notifications, &sockfd);
 
     init_board(&board);
+    print_board(&board);
+
     while (1) {
-        print_board(&board);
         printf("Enter your move (e.g., a2 a3): ");
 
         // Read user input
@@ -121,20 +120,14 @@ int main() {
         // Send the move to the server
         send(sockfd, buffer, strlen(buffer), 0);
 
-        // Receive the server response
+        // Receive server response (move validation or error message)
         memset(buffer, 0, sizeof(buffer));
-        recv(sockfd, buffer, sizeof(buffer) - 1, 0);  // Leave space for null terminator
+        recv(sockfd, buffer, sizeof(buffer) - 1, 0);
         buffer[sizeof(buffer) - 1] = '\0';  // Ensure null termination
-        printf("Server: %s\n", buffer);
-
-        // Check if the move is valid and make the move on the local board
-        if (strncmp(buffer, "Valid move", 10) == 0) {
-            make_move(&board, convert_to_move(pMove));
-        }
+        print_board(buffer);
     }
 
     closesocket(sockfd);
     WSACleanup();
     return 0;
 }
-
