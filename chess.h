@@ -53,6 +53,9 @@ int can_bishop_move(ChessBoard *board, Move move, char figure);
 int can_queen_move(ChessBoard *board, Move move, char figure);
 int can_king_move(ChessBoard *board, Move move, char figure);
 
-int is_position_under_attack(ChessBoard *board, Position move, char figure);
+int is_position_under_attack(ChessBoard *board, Position move);
+int is_white_king_C(ChessBoard *board);
+int is_black_king_check(ChessBoard *board);
+Position find_figure(ChessBoard *board, char figure);
 
 #endif // CHESS_H
