@@ -16,6 +16,7 @@ typedef struct {
     int player_turn;
     int paired;
     char username[50];
+    enum FiguresColor color;
 } ClientInfo;
 
 char user_nick[50];
@@ -36,12 +37,17 @@ void *handle_client(void *arg) {
 
             Move move = convert_to_move(pMove);
 
-            printf("\n(%c%c) - (%c%c) = (%d %d) - (%d %d)\n",pMove.from_col,pMove.from_row,pMove.to_col,pMove.to_row, move.from_col,move.from_row,move.to_col,move.to_row);
+            printf("\n(%c%c) - (%c%c) = (%d %d) - (%d %d)\n",pMove.from_col,pMove.from_row,pMove.to_col,pMove.to_row, move.from.col,move.from.row,move.to.col,move.to.row);
 
-            if (is_valid_move(&client->board, move, All)) {
+            if (is_valid_move(&client->board, move, client->color)) {
                 make_move(&client->board, move);
                 client->player_turn = 1 - client->player_turn;
-                send(client->sockfd, "Valid move\n", 11, 0);
+                if(is_black_king_check(&client->board))
+                    send(client->sockfd, "Black King Check\n", 11, 0);
+                else if(is_white_king_check(&client->board))
+                    send(client->sockfd, "White King Check\n", 11, 0);
+                else
+                    send(client->sockfd, "Valid move\n", 11, 0);
             } else {
                 send(client->sockfd, "Invalid move\n", 13, 0);
             }
@@ -160,6 +166,9 @@ void pair_clients(ClientInfo *client1, ClientInfo *client2, int game_id) {
 
     client1->player_turn = 0;
     client2->player_turn = 1;
+
+    client1->color = White;
+    client2->color = Black;
 
     printf("Game ID: %d, Player 1 username: %s , Player 2 username: %s\n", game_id, client1->username,client2->username);
 
