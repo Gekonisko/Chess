@@ -14,7 +14,6 @@ typedef struct {
     struct sockaddr_in address;
     int addr_len;
     ChessBoard board;
-    int player_turn;
     int paired;
     char username[50];
     enum FiguresColor color;
@@ -60,13 +59,12 @@ void *handle_client(void *arg) {
                 // Make the move on the board
                 make_move(&client->board, move);
 
-                // Synchronize the board with the opponent
+                // Notify opponent about the move made
                 if (opponent) {
-                    memcpy(&opponent->board, &client->board, sizeof(ChessBoard));
+                    char notify_msg[1024];
+                    snprintf(notify_msg, sizeof(notify_msg), "Opponent moved: %c%c %c%c\n", pMove.from_col, pMove.from_row, pMove.to_col, pMove.to_row);
+                    send(opponent->sockfd, notify_msg, strlen(notify_msg), 0);
                 }
-
-                // Toggle player turn
-                client->player_turn = 1 - client->player_turn;
 
                 // Check for check conditions
                 if (is_black_king_check(&client->board))
@@ -75,19 +73,6 @@ void *handle_client(void *arg) {
                     notify_opponent(client, "White King Check\n");
                 else
                     notify_opponent(client, "Valid move\n");
-
-                // Notify opponent about the move made
-                if (opponent) {
-                    char notify_msg[1024];
-                    snprintf(notify_msg, sizeof(notify_msg), "Opponent moved: %c%c to %c%c\n", pMove.from_col, pMove.from_row, pMove.to_col, pMove.to_row);
-                    send(opponent->sockfd, notify_msg, strlen(notify_msg), 0);
-                }
-
-                // Send updated board state and all moves to both clients
-                send(client->sockfd, &client->board, sizeof(ChessBoard), 0);
-                if (opponent)
-                    send(opponent->sockfd, &client->board, sizeof(ChessBoard), 0);
-
             } else {
                 send(client->sockfd, "Invalid move\n", 13, 0);
             }
@@ -217,19 +202,14 @@ void pair_clients(ClientInfo *client1, ClientInfo *client2, int game_id) {
     memcpy(&client1->board, &server_board, sizeof(ChessBoard));
     memcpy(&client2->board, &server_board, sizeof(ChessBoard));
 
-    client1->player_turn = 0;
-    client2->player_turn = 1;
-
     client1->color = White;
     client2->color = Black;
 
     printf("Game ID: %d, Player 1 username: %s, Player 2 username: %s\n", game_id, client1->username, client2->username);
 
-    // Notify clients about the start of the game
     send(client1->sockfd, "Game started. You are White.\n", 30, 0);
     send(client2->sockfd, "Game started. You are Black.\n", 30, 0);
 
-    // Starting the game
     pthread_create(&(pthread_t){0}, NULL, handle_client, client1);
     pthread_create(&(pthread_t){0}, NULL, handle_client, client2);
 }
@@ -264,7 +244,7 @@ int main() {
     }
 
     if (listen(sockfd, MAX_CLIENTS) == SOCKET_ERROR) {
-        printf("Listen failed: %d\n", WSAGetLastError());
+        printf("Socket listen failed: %d\n", WSAGetLastError());
         closesocket(sockfd);
         WSACleanup();
         exit(1);
@@ -272,42 +252,37 @@ int main() {
 
     printf("Server listening on port %d\n", PORT);
 
-    // Initialize the server board
     init_server_board();
 
     while ((newsockfd = accept(sockfd, (struct sockaddr *)&client_addr, &client_len)) != INVALID_SOCKET) {
-        ClientInfo *client = malloc(sizeof(ClientInfo));
-        if (client == NULL) {
-            printf("Failed to allocate memory for client\n");
-            closesocket(newsockfd);
-            continue;
-        }
+        ClientInfo *client_info = (ClientInfo *)malloc(sizeof(ClientInfo));
+        client_info->sockfd = newsockfd;
+        client_info->addr_len = client_len;
+        client_info->paired = 0;
+        client_info->num_moves = 0;
 
-        printf("Client connected\n");
-
-        // Handle login or register
         handle_login_register(newsockfd);
 
-        client->sockfd = newsockfd;
-        client->address = client_addr;
-        client->addr_len = client_len;
-        client->paired = 0;
-        strcpy(client->username, user_nick);
+        strcpy(client_info->username, user_nick);
 
         pthread_mutex_lock(&mutex);
-
         if (waiting_client == NULL) {
-            waiting_client = client;
+            waiting_client = client_info;
+            printf("Waiting for another player to join...\n");
         } else {
-            pair_clients(waiting_client, client, i);
-            i++;
+            pair_clients(waiting_client, client_info, ++i);
             waiting_client = NULL;
         }
-
         pthread_mutex_unlock(&mutex);
     }
 
-    printf("Server shutting down\n");
+    if (newsockfd == INVALID_SOCKET) {
+        printf("Socket accept failed: %d\n", WSAGetLastError());
+        closesocket(sockfd);
+        WSACleanup();
+        exit(1);
+    }
+
     closesocket(sockfd);
     WSACleanup();
     return 0;
