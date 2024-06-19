@@ -1,10 +1,12 @@
+// Zaktualizowany plik client.c
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <winsock2.h>
+#include <pthread.h>
 #include "chess.h"
 
-#define PORT 8080
+#define PORT 9090
 
 void login_screen(SOCKET sockfd) {
     char choice;
@@ -48,14 +50,34 @@ void login_screen(SOCKET sockfd) {
     }
 }
 
+void *receive_notifications(void *arg) {
+    SOCKET sockfd = *(SOCKET *)arg;
+    char buffer[1024];
+    int n;
+
+    while ((n = recv(sockfd, buffer, sizeof(buffer) - 1, 0)) > 0) {
+        buffer[n] = '\0';
+
+        // Check if buffer contains the board
+        if (strstr(buffer, "THBQKBHT") != NULL || strstr(buffer, "thbqkbht") != NULL) {
+            ChessBoard board;
+            memcpy(&board, buffer, sizeof(ChessBoard));
+            print_board(&board);
+        } else {
+            printf("Notification: %s\n", buffer);
+        }
+    }
+
+    return NULL;
+}
 int main() {
     WSADATA wsaData;
     SOCKET sockfd;
     struct sockaddr_in server_addr;
     char buffer[1024];
     PlayerMove pMove;
-    Move move;
     ChessBoard board;
+    pthread_t notification_thread;
 
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
         printf("WSAStartup failed: %d\n", WSAGetLastError());
@@ -77,12 +99,15 @@ int main() {
         exit(1);
     }
 
-    // printf("Config test");
     login_screen(sockfd);
 
+    // Start notification thread for receiving server messages
+    pthread_create(&notification_thread, NULL, receive_notifications, &sockfd);
+
     init_board(&board);
+    print_board(&board);
+
     while (1) {
-        print_board(&board);
         printf("Enter your move (e.g., a2 a3): ");
 
         // Read user input
@@ -103,16 +128,11 @@ int main() {
         // Send the move to the server
         send(sockfd, buffer, strlen(buffer), 0);
 
-        // Receive the server response
+        // Receive server response (move validation or error message)
         memset(buffer, 0, sizeof(buffer));
-        recv(sockfd, buffer, sizeof(buffer) - 1, 0);  // Leave space for null terminator
+        recv(sockfd, buffer, sizeof(buffer) - 1, 0);
         buffer[sizeof(buffer) - 1] = '\0';  // Ensure null termination
-        printf("Server: %s\n", buffer);
-
-        // Check if the move is valid and make the move on the local board
-        if (strncmp(buffer, "Valid move", 10) == 0) {
-            make_move(&board, convert_to_move(pMove));
-        }
+        print_board(buffer);
     }
 
     closesocket(sockfd);
